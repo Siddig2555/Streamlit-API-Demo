@@ -4,7 +4,8 @@ import requests
 from typing import List
 
 # ----------------------------
-# تم التعديل: وضع رابط API الجديد الذي أعطاه لك Colab (ngrok)
+# رابط API الذي أعطاه لك Colab (ngrok)
+# تم التأكد من صحة الرابط: https://haematozoal-marquetta-unexceptional.ngrok-free.dev
 API_BASE_URL = "https://haematozoal-marquetta-unexceptional.ngrok-free.dev"
 # ----------------------------
 
@@ -15,22 +16,42 @@ SYMBOLS_MAP = {
 }
 SYMBOL_KEYS = list(SYMBOLS_MAP.keys())
 
+# الإعداد الافتراضي للصفحة
 st.set_page_config(page_title="نظام التوقع الذكي", layout="wide")
 
-# ---- CSS (مقتبس من كودك الأصلي) ----
+# ---- CSS (لتحسين شكل الكروت والألوان) ----
 st.markdown("""
 <style>
+/* CSS مُحسَّن للاستجابة على شاشات الجوال */
 .smart-ensemble-container { font-family: "Segoe UI", Tahoma, Arial, sans-serif; color: #dfe7ff; background: #1a1f2e;
   border-radius: 12px; padding: 15px; margin: 10px 0; }
-.card { background: linear-gradient(180deg, rgba(29,36,49,0.9), rgba(17,23,33,0.9)); border-radius:10px; padding:15px;
-  min-width:140px; flex:1; box-sizing:border-box; border:1px solid rgba(120,95,255,0.18); box-shadow:0 4px 12px rgba(0,0,0,0.45); display:flex;
-  flex-direction:column; align-items:center; font-size:11px; color: #dfe7ff; }
-.progress-inner { height: 6px; border-radius: 6px; background: linear-gradient(90deg, #6b63ff, #ff5ec6); width:0%; }
-.current-display { background: #1e2433; padding: 12px; border-radius: 8px; margin: 10px 0; text-align:center; font-size:16px; color:#888;}
+  
+.card { 
+  background: linear-gradient(180deg, rgba(29,36,49,0.9), rgba(17,23,33,0.9)); 
+  border-radius:10px; 
+  padding:10px; /* تقليل البادينج */
+  min-width:70px; /* تقليل الحد الأدنى للعرض */
+  flex:1; 
+  box-sizing:border-box; 
+  border:1px solid rgba(120,95,255,0.18); 
+  box-shadow:0 4px 8px rgba(0,0,0,0.3); 
+  display:flex;
+  flex-direction:column; 
+  align-items:center; 
+  font-size:10px; /* تصغير الخط قليلاً */
+  color: #dfe7ff; 
+  margin: 5px; /* إضافة مسافة بين الكروت */
+}
+.stButton>button {
+    width: 100%; /* جعل الأزرار تأخذ عرض العمود بالكامل */
+    padding: 10px 5px; /* تقليل حجم الزر ليتناسب مع تخطيط 5 أعمدة */
+    font-size: 14px; /* حجم خط الزر */
+}
+.current-display { background: #1e2433; padding: 10px; border-radius: 8px; margin: 10px 0; text-align:center; font-size:14px; color:#888;}
 </style>
 """, unsafe_allow_html=True)
 
-# ---- Sidebar stats ----
+# ---- Sidebar stats (لم يتغير) ----
 with st.sidebar:
     st.markdown("### 🎯 نظام التوقع الذكي")
     try:
@@ -56,21 +77,27 @@ if mode == '🎮 إدخال النتائج':
 else:
     st.markdown('<div class="current-display">🔥 اختر HOT واحد</div>', unsafe_allow_html=True)
 
-# keyboard grid
-cols = st.columns(5)
+# ----------------------------------------------------
+# 1. لوحة المفاتيح: تم ترتيبها في 5 أعمدة لتكون أفقية
+# ----------------------------------------------------
+# تقسيم الرموز لصفوف من 5
+num_cols = 5
+cols = st.columns(num_cols)
 buttons = {}
-i = 0
-for k in SYMBOL_KEYS:
-    col = cols[i % 5]
-    if col.button(SYMBOLS_MAP[k] + f"  ({k})"):
+
+for i, k in enumerate(SYMBOL_KEYS):
+    col = cols[i % num_cols] # يضمن تكرار الأعمدة (0, 1, 2, 3, 4, 0, 1, ...)
+    # استخدم key فريد لتجنب أخطاء Streamlit
+    if col.button(SYMBOLS_MAP[k] + f"  ({k})", key=f"btn_{k}"):
         buttons['pressed'] = k
-    i += 1
 
 # Keep session state for local accumulation before sending
 if 'temp_results' not in st.session_state:
     st.session_state['temp_results'] = []
 if 'temp_hot' not in st.session_state:
     st.session_state['temp_hot'] = None
+if 'last_prediction' not in st.session_state:
+    st.session_state['last_prediction'] = [] # تهيئة قائمة التوقعات
 
 # handle button pressed
 if 'pressed' in buttons:
@@ -80,27 +107,36 @@ if 'pressed' in buttons:
     else:
         st.session_state['temp_hot'] = key
 
-# display current collected
+# ----------------------------------------------------
+# 2. عرض النتائج المجمعة (تحت الكيبورد مباشرة)
+# ----------------------------------------------------
 if mode == '🎮 إدخال النتائج':
     if st.session_state['temp_results']:
         emojis = " ".join([SYMBOLS_MAP[s] for s in st.session_state['temp_results']])
-        st.markdown(f"<div class='current-display'>📊 النتائج: {emojis}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='current-display'>📊 النتائج المضافة: {emojis}</div>", unsafe_allow_html=True)
     else:
-        st.markdown("<div class='current-display'>لا توجد نتائج مضافة</div>", unsafe_allow_html=True)
+        st.markdown("<div class='current-display'>لا توجد نتائج مضافة بعد</div>", unsafe_allow_html=True)
 else:
     if st.session_state['temp_hot']:
-        st.markdown(f"<div class='current-display'>🔥 HOT: {SYMBOLS_MAP[st.session_state['temp_hot']]} ({st.session_state['temp_hot']})</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='current-display'>🔥 HOT المختار: {SYMBOLS_MAP[st.session_state['temp_hot']]} ({st.session_state['temp_hot']})</div>", unsafe_allow_html=True)
     else:
         st.markdown("<div class='current-display'>لم يتم اختيار HOT</div>", unsafe_allow_html=True)
 
-# control buttons
+st.markdown("---")
+
+
+# ----------------------------------------------------
+# 3. أزرار التحكم (مسح، إضافة، مسح الكل)
+# ----------------------------------------------------
 c1, c2, c3 = st.columns([1,1,1])
 with c1:
-    if st.button("🗑️ مسح الحالي"):
+    if st.button("🗑️ مسح الحالي", key="btn_clear_current"):
         st.session_state['temp_results'] = []
         st.session_state['temp_hot'] = None
+        st.session_state['last_prediction'] = [] # مسح التوقع عند مسح النتائج
+        st.rerun() # إعادة تشغيل الواجهة لرؤية التغيير
 with c2:
-    if st.button("🎯 إضافة وتوقع"):
+    if st.button("🎯 إضافة وتوقع", key="btn_add_predict"):
         # إرسال النتائج المؤقتة إلى Colab API
         try:
             # أولاً إذا هناك نتائج نضيفها
@@ -114,42 +150,63 @@ with c2:
             if resp.get("ok"):
                 top = resp.get("top", [])
                 st.session_state['last_prediction'] = top
+                st.session_state['temp_results'] = [] # مسح النتائج المؤقتة بعد الإضافة الناجحة
+                st.session_state['temp_hot'] = None
+                st.rerun() # إعادة تشغيل الواجهة لرؤية التوقع الجديد
             else:
                 st.error("خطأ في التوقع: " + str(resp.get("error")))
         except Exception as e:
-            st.error("خطأ تواصل مع الـ API: " + str(e))
+            st.error("خطأ تواصل مع الـ API: تأكد أن خادم Colab يعمل. تفاصيل: " + str(e))
 with c3:
-    if st.button("🔄 مسح الكل"):
+    if st.button("🔄 مسح الكل", key="btn_clear_all"):
         try:
             requests.post(f"{API_BASE_URL}/clear_all", timeout=4)
             st.session_state['temp_results'] = []
             st.session_state['temp_hot'] = None
-            st.success("✅ تم المسح الكامل")
+            st.session_state['last_prediction'] = [] # مسح التوقع
+            st.success("✅ تم المسح الكامل للسجل")
+            st.rerun()
         except Exception as e:
-            st.error("خطأ مسح: " + str(e))
+            st.error("خطأ مسح: تأكد أن خادم Colab يعمل. تفاصيل: " + str(e))
 
-# show prediction cards
+st.markdown("---")
+
+# ----------------------------------------------------
+# 4. عرض التوقعات الأربعة: تم وضعها في 4 أعمدة أفقية
+# ----------------------------------------------------
 st.markdown("## 📊 أفضل توقعات")
-if 'last_prediction' in st.session_state and st.session_state['last_prediction']:
-    cols = st.columns(4)
-    for idx, pred in enumerate(st.session_state['last_prediction'][:4]):
-        c = cols[idx]
-        c.markdown(f"<div class='card'><div style='font-size:28px'>{pred['emoji']}</div><div style='font-weight:700'>{pred['symbol']}</div><div style='font-size:18px'>{pred['prob']*100:.2f}%</div></div>", unsafe_allow_html=True)
-else:
-    # حاول جلب توقع افتراضي
+prediction_list = st.session_state.get('last_prediction')
+
+# إذا لم يكن هناك توقع في الـ session، حاول جلب توقع افتراضي/آخر من API
+if not prediction_list:
     try:
         resp = requests.get(f"{API_BASE_URL}/predict", timeout=4).json()
         if resp.get("ok"):
-            top = resp.get("top", [])
-            cols = st.columns(4)
-            for idx, pred in enumerate(top[:4]):
-                c = cols[idx]
-                c.markdown(f"<div class='card'><div style='font-size:28px'>{pred['emoji']}</div><div style='font-weight:700'>{pred['symbol']}</div><div style='font-size:18px'>{pred['prob']*100:.2f}%</div></div>", unsafe_allow_html=True)
+            prediction_list = resp.get("top", [])
         else:
-            st.info("أدخل نتائج ثم اضغط إضافة وتوقع")
+            st.info("أدخل نتائج ثم اضغط إضافة وتوقع (API يعمل).")
     except Exception:
-        st.info("API غير متوفر الآن")
+        st.warning("⚠️ API غير متوفر أو غير مستجيب. تأكد من تشغيل خادم Colab.")
+
+# عرض التوقعات في 4 أعمدة (أفقياً)
+if prediction_list:
+    # استخدام 4 أعمدة لعرض الـ Top 4
+    cols = st.columns(4) 
+    for idx, pred in enumerate(prediction_list[:4]):
+        c = cols[idx]
+        # استخدام div لتنسيق البطاقة داخل العمود
+        c.markdown(
+            f"""
+            <div class='card'>
+                <div style='font-size:24px; margin-bottom: 2px;'>{pred['emoji']}</div>
+                <div style='font-weight:600'>{pred['symbol']}</div>
+                <div style='font-size:16px; font-weight: bold; color: #ff88d2;'>{pred['prob']*100:.2f}%</div>
+            </div>
+            """, 
+            unsafe_allow_html=True
+        )
+else:
+    st.info("اضغط على الرموز أعلاه ثم '🎯 إضافة وتوقع' لرؤية أفضل 4 توقعات.")
 
 st.markdown("---")
-st.caption("واجهة Streamlit متصلة بخادم Google Colab. لتحديث رابط API استخدم متغير API_BASE_URL في أعلى الملف.")
-
+st.caption("واجهة Streamlit متصلة بخادم Google Colab. تأكد من أن الخادم يعمل لكي تستجيب الواجهة.")
